@@ -1,10 +1,10 @@
 package com.redhat.cloudnative;
 
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
-import javax.ws.rs.ext.ExceptionMapper;
-import javax.ws.rs.ext.Provider;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
+import jakarta.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.ext.Provider;
 
 @Provider
 public class InvalidInventoryExceptionMapper implements ExceptionMapper<InvalidInventoryException> {
@@ -23,7 +23,7 @@ public class InvalidInventoryExceptionMapper implements ExceptionMapper<InvalidI
 
         return Response.status(Response.Status.BAD_REQUEST)
                 .entity(errorResponse)
-                .type(javax.ws.rs.core.MediaType.APPLICATION_JSON)
+                .type(jakarta.ws.rs.core.MediaType.APPLICATION_JSON)
                 .build();
     }
 }

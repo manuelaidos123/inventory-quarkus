@@ -1,19 +1,21 @@
 package com.redhat.cloudnative;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.transaction.Transactional;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.PATCH;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PATCH;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+
 import java.net.URI;
 import java.util.List;
 
@@ -52,8 +54,7 @@ public class InventoryResource {
 
     @POST
     @Transactional
-    public Response create(Inventory inventory) {
-        validateInventory(inventory);
+    public Response create(@Valid Inventory inventory) {
         inventory.persist();
         return Response.created(URI.create("/api/inventory/" + inventory.id))
                 .entity(inventory)
@@ -63,12 +64,11 @@ public class InventoryResource {
     @PUT
     @Path("/{itemId}")
     @Transactional
-    public Inventory update(@PathParam("itemId") Long itemId, Inventory updatedInventory) {
+    public Inventory update(@PathParam("itemId") Long itemId, @Valid Inventory updatedInventory) {
         Inventory inventory = Inventory.findById(itemId);
         if (inventory == null) {
             throw new InventoryNotFoundException(itemId);
         }
-        validateInventory(updatedInventory);
         inventory.quantity = updatedInventory.quantity;
         inventory.persist();
         return inventory;
@@ -112,14 +112,5 @@ public class InventoryResource {
         return Response.ok()
                 .entity("{\"deleted\": " + deleted + "}")
                 .build();
-    }
-
-    private void validateInventory(Inventory inventory) {
-        if (inventory == null) {
-            throw new InvalidInventoryException("Inventory item cannot be null");
-        }
-        if (inventory.quantity < 0) {
-            throw new InvalidInventoryException("Quantity cannot be negative");
-        }
     }
 }
