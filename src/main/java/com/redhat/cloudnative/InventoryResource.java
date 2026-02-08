@@ -42,29 +42,18 @@ public class InventoryResource {
 
     @GET
     @Path("/{itemId}")
-    public Response getAvailability(@PathParam("itemId") Long itemId) {
+    public Inventory getAvailability(@PathParam("itemId") Long itemId) {
         Inventory inventory = Inventory.findById(itemId);
         if (inventory == null) {
-            return Response.status(Response.Status.NOT_FOUND)
-                    .entity("{\"error\": \"Inventory item not found with id: " + itemId + "\"}")
-                    .build();
+            throw new InventoryNotFoundException(itemId);
         }
-        return Response.ok(inventory).build();
+        return inventory;
     }
 
     @POST
     @Transactional
     public Response create(Inventory inventory) {
-        if (inventory == null) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"error\": \"Inventory item cannot be null\"}")
-                    .build();
-        }
-        if (inventory.quantity < 0) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"error\": \"Quantity cannot be negative\"}")
-                    .build();
-        }
+        validateInventory(inventory);
         inventory.persist();
         return Response.created(URI.create("/api/inventory/" + inventory.id))
                 .entity(inventory)
@@ -74,51 +63,34 @@ public class InventoryResource {
     @PUT
     @Path("/{itemId}")
     @Transactional
-    public Response update(@PathParam("itemId") Long itemId, Inventory updatedInventory) {
+    public Inventory update(@PathParam("itemId") Long itemId, Inventory updatedInventory) {
         Inventory inventory = Inventory.findById(itemId);
         if (inventory == null) {
-            return Response.status(Response.Status.NOT_FOUND)
-                    .entity("{\"error\": \"Inventory item not found with id: " + itemId + "\"}")
-                    .build();
+            throw new InventoryNotFoundException(itemId);
         }
-        if (updatedInventory == null) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"error\": \"Inventory item cannot be null\"}")
-                    .build();
-        }
-        if (updatedInventory.quantity < 0) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"error\": \"Quantity cannot be negative\"}")
-                    .build();
-        }
+        validateInventory(updatedInventory);
         inventory.quantity = updatedInventory.quantity;
         inventory.persist();
-        return Response.ok(inventory).build();
+        return inventory;
     }
 
     @PATCH
     @Path("/{itemId}/quantity")
     @Transactional
-    public Response updateQuantity(@PathParam("itemId") Long itemId, @QueryParam("quantity") Integer quantity) {
-        Inventory inventory = Inventory.findById(itemId);
-        if (inventory == null) {
-            return Response.status(Response.Status.NOT_FOUND)
-                    .entity("{\"error\": \"Inventory item not found with id: " + itemId + "\"}")
-                    .build();
-        }
+    public Inventory updateQuantity(@PathParam("itemId") Long itemId, @QueryParam("quantity") Integer quantity) {
         if (quantity == null) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"error\": \"Quantity parameter is required\"}")
-                    .build();
+            throw new InvalidInventoryException("Quantity parameter is required");
         }
         if (quantity < 0) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("{\"error\": \"Quantity cannot be negative\"}")
-                    .build();
+            throw new InvalidInventoryException("Quantity cannot be negative");
+        }
+        Inventory inventory = Inventory.findById(itemId);
+        if (inventory == null) {
+            throw new InventoryNotFoundException(itemId);
         }
         inventory.quantity = quantity;
         inventory.persist();
-        return Response.ok(inventory).build();
+        return inventory;
     }
 
     @DELETE
@@ -127,9 +99,7 @@ public class InventoryResource {
     public Response delete(@PathParam("itemId") Long itemId) {
         Inventory inventory = Inventory.findById(itemId);
         if (inventory == null) {
-            return Response.status(Response.Status.NOT_FOUND)
-                    .entity("{\"error\": \"Inventory item not found with id: " + itemId + "\"}")
-                    .build();
+            throw new InventoryNotFoundException(itemId);
         }
         inventory.delete();
         return Response.noContent().build();
@@ -142,5 +112,14 @@ public class InventoryResource {
         return Response.ok()
                 .entity("{\"deleted\": " + deleted + "}")
                 .build();
+    }
+
+    private void validateInventory(Inventory inventory) {
+        if (inventory == null) {
+            throw new InvalidInventoryException("Inventory item cannot be null");
+        }
+        if (inventory.quantity < 0) {
+            throw new InvalidInventoryException("Quantity cannot be negative");
+        }
     }
 }
