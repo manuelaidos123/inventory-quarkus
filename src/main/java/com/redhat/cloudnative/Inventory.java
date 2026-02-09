@@ -7,10 +7,15 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 @Entity
 @Table(name = "INVENTORY")
 public class Inventory extends PanacheEntity {
+
+    @Column(name = "product_id", unique = true)
+    @NotNull(message = "Product ID is required")
+    public Long productId;
 
     @Column(name = "quantity")
     @NotNull(message = "Quantity is required")
@@ -19,6 +24,28 @@ public class Inventory extends PanacheEntity {
 
     @Override
     public String toString() {
-        return "Inventory [Id='" + id + '\'' + ", quantity=" + quantity + ']';
+        return "Inventory [Id='" + id + '\'' + ", productId=" + productId + ", quantity=" + quantity + ']';
+    }
+
+    /**
+     * Get the ID (for OpenAPI documentation)
+     */
+    @Schema(description = "Inventory ID (auto-generated, read-only)", readOnly = true)
+    public Long getId() {
+        return id;
+    }
+
+    /**
+     * Find inventory by product ID
+     */
+    public static Inventory findByProductId(Long productId) {
+        return find("productId", productId).firstResult();
+    }
+
+    /**
+     * Check if inventory exists for a product
+     */
+    public static boolean existsByProductId(Long productId) {
+        return count("productId", productId) > 0;
     }
 }

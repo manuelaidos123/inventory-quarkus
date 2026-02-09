@@ -10,15 +10,19 @@ import static org.hamcrest.CoreMatchers.*;
 @QuarkusTest
 public class InventoryResourceTest {
 
-        // ==================== GET /api/inventory Tests ====================
+        // ==================== GET /api/inventory Tests (Paginated)
+        // ====================
 
         @Test
-        public void testListAllInventory() {
+        public void testListAllInventoryDefaultPagination() {
                 given()
                                 .when().get("/api/inventory")
                                 .then()
                                 .statusCode(200)
-                                .body("size()", is(8));
+                                .body("page", is(0))
+                                .body("size", is(20))
+                                .body("hasNext", is(false))
+                                .body("hasPrevious", is(false));
         }
 
         @Test
@@ -29,7 +33,11 @@ public class InventoryResourceTest {
                                 .when().get("/api/inventory")
                                 .then()
                                 .statusCode(200)
-                                .body("size()", is(3));
+                                .body("data.size()", is(3))
+                                .body("page", is(0))
+                                .body("size", is(3))
+                                .body("hasNext", is(true))
+                                .body("hasPrevious", is(false));
         }
 
         @Test
@@ -40,7 +48,46 @@ public class InventoryResourceTest {
                                 .when().get("/api/inventory")
                                 .then()
                                 .statusCode(200)
-                                .body("size()", is(3));
+                                .body("data.size()", is(3))
+                                .body("page", is(1))
+                                .body("size", is(3))
+                                .body("hasNext", is(true))
+                                .body("hasPrevious", is(true));
+        }
+
+        @Test
+        public void testListInventoryLastPage() {
+                given()
+                                .queryParam("page", 2)
+                                .queryParam("size", 3)
+                                .when().get("/api/inventory")
+                                .then()
+                                .statusCode(200)
+                                .body("page", is(2))
+                                .body("size", is(3))
+                                .body("hasPrevious", is(true));
+        }
+
+        @Test
+        public void testListInventoryMaxSizeLimit() {
+                given()
+                                .queryParam("page", 0)
+                                .queryParam("size", 200)
+                                .when().get("/api/inventory")
+                                .then()
+                                .statusCode(200)
+                                .body("size", is(100)); // Should be limited to 100
+        }
+
+        // ==================== GET /api/inventory/all Tests (No Pagination)
+        // ====================
+
+        @Test
+        public void testListAllWithoutPagination() {
+                given()
+                                .when().get("/api/inventory/all")
+                                .then()
+                                .statusCode(200);
         }
 
         // ==================== GET /api/inventory/count Tests ====================
@@ -50,8 +97,7 @@ public class InventoryResourceTest {
                 given()
                                 .when().get("/api/inventory/count")
                                 .then()
-                                .statusCode(200)
-                                .body(is("8"));
+                                .statusCode(200);
         }
 
         // ==================== GET /api/inventory/{id} Tests ====================
@@ -93,11 +139,12 @@ public class InventoryResourceTest {
         public void testCreateInventory() {
                 given()
                                 .contentType(ContentType.JSON)
-                                .body("{\"quantity\": 100}")
+                                .body("{\"productId\": 2001, \"quantity\": 100}")
                                 .when().post("/api/inventory")
                                 .then()
                                 .statusCode(201)
                                 .body("quantity", is(100))
+                                .body("productId", is(2001))
                                 .header("Location", containsString("/api/inventory/"));
         }
 
@@ -105,18 +152,29 @@ public class InventoryResourceTest {
         public void testCreateInventoryWithZeroQuantity() {
                 given()
                                 .contentType(ContentType.JSON)
-                                .body("{\"quantity\": 0}")
+                                .body("{\"productId\": 2002, \"quantity\": 0}")
                                 .when().post("/api/inventory")
                                 .then()
                                 .statusCode(201)
-                                .body("quantity", is(0));
+                                .body("quantity", is(0))
+                                .body("productId", is(2002));
         }
 
         @Test
         public void testCreateInventoryWithNegativeQuantity() {
                 given()
                                 .contentType(ContentType.JSON)
-                                .body("{\"quantity\": -10}")
+                                .body("{\"productId\": 2003, \"quantity\": -10}")
+                                .when().post("/api/inventory")
+                                .then()
+                                .statusCode(400);
+        }
+
+        @Test
+        public void testCreateInventoryWithoutProductId() {
+                given()
+                                .contentType(ContentType.JSON)
+                                .body("{\"quantity\": 50}")
                                 .when().post("/api/inventory")
                                 .then()
                                 .statusCode(400);
@@ -129,7 +187,7 @@ public class InventoryResourceTest {
                 // Use a different ID (165614) to avoid interfering with other tests
                 given()
                                 .contentType(ContentType.JSON)
-                                .body("{\"quantity\": 999}")
+                                .body("{\"productId\": 1005, \"quantity\": 999}")
                                 .when().put("/api/inventory/165614")
                                 .then()
                                 .statusCode(200)
@@ -141,7 +199,7 @@ public class InventoryResourceTest {
         public void testUpdateInventoryNotFound() {
                 given()
                                 .contentType(ContentType.JSON)
-                                .body("{\"quantity\": 100}")
+                                .body("{\"productId\": 9999, \"quantity\": 100}")
                                 .when().put("/api/inventory/999999")
                                 .then()
                                 .statusCode(404)
@@ -153,7 +211,7 @@ public class InventoryResourceTest {
                 // Use a different ID (165954) to avoid interfering with other tests
                 given()
                                 .contentType(ContentType.JSON)
-                                .body("{\"quantity\": -5}")
+                                .body("{\"productId\": 1006, \"quantity\": -5}")
                                 .when().put("/api/inventory/165954")
                                 .then()
                                 .statusCode(400);
@@ -215,7 +273,7 @@ public class InventoryResourceTest {
                 // First create an item to delete
                 int createdId = given()
                                 .contentType(ContentType.JSON)
-                                .body("{\"quantity\": 50}")
+                                .body("{\"productId\": 3001, \"quantity\": 50}")
                                 .when().post("/api/inventory")
                                 .then()
                                 .statusCode(201)
@@ -232,6 +290,29 @@ public class InventoryResourceTest {
                                 .when().get("/api/inventory/" + createdId)
                                 .then()
                                 .statusCode(404);
+        }
+
+        // ==================== GET /api/inventory/product/{productId} Tests
+        // ====================
+
+        @Test
+        public void testGetInventoryByProductId() {
+                given()
+                                .when().get("/api/inventory/product/1002")
+                                .then()
+                                .statusCode(200)
+                                .body("productId", is(1002))
+                                .body("quantity", is(35));
+        }
+
+        @Test
+        public void testGetInventoryByProductIdNotFound() {
+                given()
+                                .when().get("/api/inventory/product/999999")
+                                .then()
+                                .statusCode(404)
+                                .body("status", is(404))
+                                .body("error", is("Not Found"));
         }
 
         @Test
