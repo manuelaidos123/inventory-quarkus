@@ -3,6 +3,8 @@ package com.redhat.cloudnative;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -26,7 +28,9 @@ import java.util.List;
 public class InventoryResource {
 
     @GET
-    public List<Inventory> listAll(@QueryParam("page") Integer page, @QueryParam("size") Integer size) {
+    public List<Inventory> listAll(
+            @QueryParam("page") Integer page,
+            @QueryParam("size") Integer size) {
         if (page != null && size != null) {
             return Inventory.findAll()
                     .page(page, size)
@@ -64,7 +68,9 @@ public class InventoryResource {
     @PUT
     @Path("/{itemId}")
     @Transactional
-    public Inventory update(@PathParam("itemId") Long itemId, @Valid Inventory updatedInventory) {
+    public Inventory update(
+            @PathParam("itemId") Long itemId,
+            @Valid Inventory updatedInventory) {
         Inventory inventory = Inventory.findById(itemId);
         if (inventory == null) {
             throw new InventoryNotFoundException(itemId);
@@ -77,18 +83,14 @@ public class InventoryResource {
     @PATCH
     @Path("/{itemId}/quantity")
     @Transactional
-    public Inventory updateQuantity(@PathParam("itemId") Long itemId, @QueryParam("quantity") Integer quantity) {
-        if (quantity == null) {
-            throw new InvalidInventoryException("Quantity parameter is required");
-        }
-        if (quantity < 0) {
-            throw new InvalidInventoryException("Quantity cannot be negative");
-        }
+    public Inventory updateQuantity(
+            @PathParam("itemId") Long itemId,
+            @Valid QuantityUpdateRequest request) {
         Inventory inventory = Inventory.findById(itemId);
         if (inventory == null) {
             throw new InventoryNotFoundException(itemId);
         }
-        inventory.quantity = quantity;
+        inventory.quantity = request.getQuantity();
         inventory.persist();
         return inventory;
     }

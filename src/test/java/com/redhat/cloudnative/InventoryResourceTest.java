@@ -165,7 +165,8 @@ public class InventoryResourceTest {
         @Test
         public void testUpdateQuantity() {
                 given()
-                                .queryParam("quantity", 500)
+                                .contentType(ContentType.JSON)
+                                .body("{\"quantity\": 500}")
                                 .when().patch("/api/inventory/329199/quantity")
                                 .then()
                                 .statusCode(200)
@@ -176,18 +177,20 @@ public class InventoryResourceTest {
         @Test
         public void testUpdateQuantityMissingParameter() {
                 given()
+                                .contentType(ContentType.JSON)
+                                .body("{}")
                                 .when().patch("/api/inventory/329199/quantity")
                                 .then()
                                 .statusCode(400)
                                 .body("status", is(400))
-                                .body("error", is("Bad Request"))
-                                .body("message", containsString("required"));
+                                .body("error", containsString("Validation"));
         }
 
         @Test
         public void testUpdateQuantityNegative() {
                 given()
-                                .queryParam("quantity", -1)
+                                .contentType(ContentType.JSON)
+                                .body("{\"quantity\": -1}")
                                 .when().patch("/api/inventory/329199/quantity")
                                 .then()
                                 .statusCode(400)
@@ -198,7 +201,8 @@ public class InventoryResourceTest {
         @Test
         public void testUpdateQuantityNotFound() {
                 given()
-                                .queryParam("quantity", 100)
+                                .contentType(ContentType.JSON)
+                                .body("{\"quantity\": 100}")
                                 .when().patch("/api/inventory/999999/quantity")
                                 .then()
                                 .statusCode(404);
