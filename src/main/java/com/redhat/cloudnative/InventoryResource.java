@@ -1,6 +1,7 @@
 package com.redhat.cloudnative;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -18,6 +19,12 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+
+import io.quarkus.cache.Cache;
+import io.quarkus.cache.CacheInvalidate;
+import io.quarkus.cache.CacheInvalidateAll;
+import io.quarkus.cache.CacheName;
+import io.quarkus.cache.CacheResult;
 
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
@@ -37,6 +44,10 @@ import java.util.List;
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Inventory", description = "Inventory management operations")
 public class InventoryResource {
+
+    @Inject
+    @CacheName("inventory-cache")
+    Cache inventoryCache;
 
     @GET
     @Operation(summary = "List all inventory items", description = "Returns a paginated list of inventory items with metadata")
@@ -76,11 +87,12 @@ public class InventoryResource {
 
     @GET
     @Path("/{itemId}")
-    @Operation(summary = "Get inventory by ID", description = "Returns a single inventory item by its ID")
+    @Operation(summary = "Get inventory by ID", description = "Returns a single inventory item by its ID (cached)")
     @APIResponses(value = {
             @APIResponse(responseCode = "200", description = "Inventory item found", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = Inventory.class))),
             @APIResponse(responseCode = "404", description = "Inventory item not found", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class)))
     })
+    @CacheResult(cacheName = "inventory-cache")
     public Inventory getAvailability(
             @Parameter(description = "Inventory item ID", required = true) @PathParam("itemId") Long itemId) {
         Inventory inventory = Inventory.findById(itemId);
@@ -92,11 +104,12 @@ public class InventoryResource {
 
     @GET
     @Path("/product/{productId}")
-    @Operation(summary = "Get inventory by product ID", description = "Returns the inventory item for a specific product")
+    @Operation(summary = "Get inventory by product ID", description = "Returns the inventory item for a specific product (cached)")
     @APIResponses(value = {
             @APIResponse(responseCode = "200", description = "Inventory item found", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = Inventory.class))),
             @APIResponse(responseCode = "404", description = "Inventory item not found for the product", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class)))
     })
+    @CacheResult(cacheName = "inventory-product-cache")
     public Inventory getByProductId(
             @Parameter(description = "Product ID", required = true) @PathParam("productId") Long productId) {
         Inventory inventory = Inventory.findByProductId(productId);
@@ -113,6 +126,8 @@ public class InventoryResource {
             @APIResponse(responseCode = "201", description = "Inventory item created", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = Inventory.class))),
             @APIResponse(responseCode = "400", description = "Invalid inventory data", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class)))
     })
+    @CacheInvalidateAll(cacheName = "inventory-cache")
+    @CacheInvalidateAll(cacheName = "inventory-product-cache")
     public Response create(
             @RequestBody(description = "Inventory item to create", required = true, content = @Content(schema = @Schema(implementation = Inventory.class))) @Valid Inventory inventory) {
         // Clear any provided ID to let the database auto-generate it
@@ -132,6 +147,8 @@ public class InventoryResource {
             @APIResponse(responseCode = "400", description = "Invalid inventory data", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class))),
             @APIResponse(responseCode = "404", description = "Inventory item not found", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class)))
     })
+    @CacheInvalidate(cacheName = "inventory-cache")
+    @CacheInvalidateAll(cacheName = "inventory-product-cache")
     public Inventory update(
             @Parameter(description = "Inventory item ID", required = true) @PathParam("itemId") Long itemId,
             @RequestBody(description = "Updated inventory data", required = true, content = @Content(schema = @Schema(implementation = Inventory.class))) @Valid Inventory updatedInventory) {
@@ -153,6 +170,8 @@ public class InventoryResource {
             @APIResponse(responseCode = "400", description = "Invalid quantity value", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class))),
             @APIResponse(responseCode = "404", description = "Inventory item not found", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class)))
     })
+    @CacheInvalidate(cacheName = "inventory-cache")
+    @CacheInvalidateAll(cacheName = "inventory-product-cache")
     public Inventory updateQuantity(
             @Parameter(description = "Inventory item ID", required = true) @PathParam("itemId") Long itemId,
             @RequestBody(description = "New quantity value", required = true, content = @Content(schema = @Schema(implementation = QuantityUpdateRequest.class))) @Valid QuantityUpdateRequest request) {
@@ -173,6 +192,8 @@ public class InventoryResource {
             @APIResponse(responseCode = "204", description = "Inventory item deleted"),
             @APIResponse(responseCode = "404", description = "Inventory item not found", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class)))
     })
+    @CacheInvalidate(cacheName = "inventory-cache")
+    @CacheInvalidateAll(cacheName = "inventory-product-cache")
     public Response delete(
             @Parameter(description = "Inventory item ID", required = true) @PathParam("itemId") Long itemId) {
         Inventory inventory = Inventory.findById(itemId);
@@ -180,6 +201,19 @@ public class InventoryResource {
             throw new InventoryNotFoundException(itemId);
         }
         inventory.delete();
+        return Response.noContent().build();
+    }
+
+    /**
+     * Clear all caches - useful for administrative purposes
+     */
+    @DELETE
+    @Path("/cache")
+    @Operation(summary = "Clear all inventory caches", description = "Clears all cached inventory data")
+    @APIResponse(responseCode = "204", description = "Caches cleared")
+    @CacheInvalidateAll(cacheName = "inventory-cache")
+    @CacheInvalidateAll(cacheName = "inventory-product-cache")
+    public Response clearCaches() {
         return Response.noContent().build();
     }
 

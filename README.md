@@ -23,6 +23,7 @@ A RESTful inventory management microservice built with Quarkus, providing CRUD o
 - ✅ OpenAPI/Swagger UI documentation
 - ✅ Health checks (liveness and readiness)
 - ✅ Comprehensive error handling with consistent error responses
+- ✅ Caching with Caffeine for improved performance
 - ✅ H2 in-memory database for development
 - ✅ Native image compilation support
 
@@ -196,6 +197,16 @@ DELETE /api/inventory/{itemId}
 
 **Response:** `204 No Content`
 
+### Clear All Caches
+
+```http
+DELETE /api/inventory/cache
+```
+
+**Response:** `204 No Content`
+
+Clears all cached inventory data. Useful for administrative purposes or when you need to force a cache refresh.
+
 ### Health Checks
 
 ```http
@@ -279,6 +290,7 @@ All errors return a consistent JSON structure:
 - **Validation**: Hibernate Validator
 - **Documentation**: SmallRye OpenAPI with Swagger UI
 - **Health**: SmallRye Health
+- **Caching**: Quarkus Cache with Caffeine
 - **Testing**: JUnit 5, Rest Assured
 
 ## Project Structure
@@ -306,6 +318,40 @@ src/
         └── NativeInventoryResourceIT.java
 ```
 
+## Caching
+
+This application uses Quarkus Cache with Caffeine backend for improved performance on read operations.
+
+### Cached Endpoints
+
+| Endpoint | Cache Name | Description |
+|----------|------------|-------------|
+| `GET /api/inventory/{itemId}` | `inventory-cache` | Cached by inventory ID |
+| `GET /api/inventory/product/{productId}` | `inventory-product-cache` | Cached by product ID |
+
+### Cache Invalidation
+
+Caches are automatically invalidated on data modifications:
+
+| Operation | Cache Behavior |
+|-----------|----------------|
+| POST (create) | All caches cleared |
+| PUT (update) | Specific ID + product cache cleared |
+| PATCH (update quantity) | Specific ID + product cache cleared |
+| DELETE | Specific ID + product cache cleared |
+
+### Cache Configuration
+
+```properties
+# Cache expires after 5 minutes of being written
+quarkus.cache.caffeine.inventory-cache.expire-after-write=5m
+quarkus.cache.caffeine.inventory-product-cache.expire-after-write=5m
+```
+
+### Manual Cache Clear
+
+Use the `DELETE /api/inventory/cache` endpoint to manually clear all caches.
+
 ## Configuration
 
 Key configuration options in `application.properties`:
@@ -318,6 +364,10 @@ quarkus.datasource.db-kind=h2
 # Hibernate
 quarkus.hibernate-orm.database.generation=drop-and-create
 quarkus.hibernate-orm.sql-load-script=import.sql
+
+# Cache Configuration (Caffeine backend)
+quarkus.cache.caffeine.inventory-cache.expire-after-write=5m
+quarkus.cache.caffeine.inventory-product-cache.expire-after-write=5m
 ```
 
 ## License
